@@ -116,6 +116,22 @@ export function ChatInterface({
           onSchemaUpdate(ti.args.collections as CollectionDefinition[]);
         }
 
+        if (
+          ti.toolName === "listCollections" &&
+          result.success === true &&
+          Array.isArray(result.collections)
+        ) {
+          const defs: CollectionDefinition[] = (
+            result.collections as Array<{ name: string; type: "document" | "edge" }>
+          ).map((c) => ({
+            name: c.name,
+            type: c.type,
+            description: "",
+            attributes: [],
+          }));
+          onSchemaUpdate(defs);
+        }
+
         setExecutionBlocks((prev) =>
           prev.map((b) => {
             if (b.id !== toolCallId) return b;
