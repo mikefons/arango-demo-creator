@@ -1,8 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { ArangoCredentials } from "@/types";
 
+const rawSecret = process.env.SESSION_SECRET;
+if (!rawSecret && process.env.NODE_ENV === "production") {
+  throw new Error("SESSION_SECRET environment variable is not set. Set it in your Vercel project settings.");
+}
+
 const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET ?? "fallback-dev-secret-32chars-min!!"
+  rawSecret ?? "fallback-dev-secret-32chars-min!!"
 );
 
 const ALG = "HS256";
