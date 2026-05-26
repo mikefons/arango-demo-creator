@@ -173,6 +173,13 @@ export function ChatInterface({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, executionBlocks]);
 
+  // Reset textarea height when input is cleared after submit
+  useEffect(() => {
+    if (!input && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }, [input]);
+
   function handleTextareaInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     handleInputChange(e);
     e.target.style.height = "auto";
@@ -321,12 +328,7 @@ export function ChatInterface({
           )}
 
           {isLoading &&
-            !messages.some(
-              (m) =>
-                m.role === "assistant" &&
-                Array.isArray(m.toolInvocations) &&
-                m.toolInvocations.length > 0
-            ) && (
+            !executionBlocks.some((b) => b.status === "running") && (
               <div className="flex gap-3 animate-slide-up">
                 <div className="w-7 h-7 rounded-lg bg-background-tertiary border border-border flex items-center justify-center flex-shrink-0 mt-0.5">
                   <Bot className="w-3.5 h-3.5 text-arango-400" />

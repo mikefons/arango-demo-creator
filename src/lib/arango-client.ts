@@ -229,9 +229,10 @@ export async function seedSyntheticData(
           if (fromDocs.length === 0 || toDocs.length === 0) return null;
 
           const edgeDocs = fromDocs.map((f, i) => ({
+            ...buildSyntheticDocument(def, i),
+            // Explicit graph IDs must come last — override any _from/_to in schema
             _from: f._id,
             _to: toDocs[i % toDocs.length]._id,
-            ...buildSyntheticDocument(def, i),
           }));
 
           const edgeCol = db.collection(def.name);
