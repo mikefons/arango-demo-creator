@@ -8,11 +8,23 @@ export function useArango() {
 
   const updateCollections = useCallback((incoming: CollectionDefinition[]) => {
     setCollections((prev) => {
-      const existing = new Map(prev.map((c) => [c.name, c]));
+      const existingMap = new Map(prev.map((c) => [c.name, c]));
       for (const col of incoming) {
-        existing.set(col.name, col);
+        const prior = existingMap.get(col.name);
+        if (prior) {
+          // Merge: preserve richer description/attributes from createCollections;
+          // always accept the incoming count (listCollections has fresh values).
+          existingMap.set(col.name, {
+            ...prior,
+            description: col.description || prior.description,
+            attributes: col.attributes.length > 0 ? col.attributes : prior.attributes,
+            count: col.count ?? prior.count,
+          });
+        } else {
+          existingMap.set(col.name, col);
+        }
       }
-      return Array.from(existing.values());
+      return Array.from(existingMap.values());
     });
   }, []);
 
