@@ -30,6 +30,12 @@ const CollectionSchema = z.object({
   attributes: z.array(AttributeSchema).min(1).max(15),
 });
 
+function toolError(label: string, err: unknown) {
+  const message = err instanceof Error ? err.message : "Unknown error";
+  console.error(`[${label}]`, message);
+  return { success: false, error: message, summary: `${label} failed: ${message}` };
+}
+
 export async function POST(req: Request) {
   const { messages, sessionToken } = (await req.json()) as {
     messages: { role: string; content: string }[];
@@ -55,6 +61,34 @@ export async function POST(req: Request) {
     messages: messages as Parameters<typeof streamText>[0]["messages"],
     maxSteps: 10,
     tools: {
+      listCollections: tool({
+        description:
+          "List all user collections in the connected database with their type (document/edge) and document count. Call this to discover what already exists before creating or seeding.",
+        parameters: z.object({}),
+        execute: async () => {
+          try {
+            const collections = await listCollections(creds);
+            const vertices = collections.filter((c) => c.type === "document");
+            const edges = collections.filter((c) => c.type === "edge");
+            return {
+              success: true,
+              total: collections.length,
+              vertices: vertices.length,
+              edges: edges.length,
+              collections,
+              summary:
+                collections.length === 0
+                  ? "Database is empty — no user collections found"
+                  : `Found ${collections.length} collection(s): ${collections
+                      .map((c) => `${c.name} (${c.type}, ${c.count} docs)`)
+                      .join(", ")}`,
+            };
+          } catch (err) {
+            return toolError("listCollections", err);
+          }
+        },
+      }),
+
       createCollections: tool({
         description:
           "Create vertex and/or edge collections in ArangoGraph. Call this first before seeding data.",
@@ -65,17 +99,21 @@ export async function POST(req: Request) {
             .describe("Array of collection definitions to create"),
         }),
         execute: async ({ collections }) => {
-          const results = await createCollections(creds, collections);
-          return {
-            success: true,
-            created: results,
-            summary: results
-              .map(
-                (r) =>
-                  `${r.created ? "Created" : "Already exists"}: ${r.name} (${r.type})`
-              )
-              .join(", "),
-          };
+          try {
+            const results = await createCollections(creds, collections);
+            return {
+              success: true,
+              created: results,
+              summary: results
+                .map(
+                  (r) =>
+                    `${r.created ? "Created" : "Already exists"}: ${r.name} (${r.type})`
+                )
+                .join(", "),
+            };
+          } catch (err) {
+            return toolError("createCollections", err);
+          }
         },
       }),
 
@@ -85,7 +123,9 @@ export async function POST(req: Request) {
         parameters: z.object({
           collections: z
             .array(CollectionSchema)
-            .describe("Collections to seed — must match previously created collections"),
+            .describe(
+              "Collections to seed — must match previously created collections"
+            ),
           documentsPerCollection: z
             .number()
             .min(5)
@@ -94,40 +134,22 @@ export async function POST(req: Request) {
             .describe("Number of documents to insert per vertex collection"),
         }),
         execute: async ({ collections, documentsPerCollection }) => {
-          const results = await seedSyntheticData(
-            creds,
-            collections,
-            documentsPerCollection
-          );
-          return {
-            success: true,
-            results,
-            summary: results
-              .map((r) => `Seeded ${r.inserted} docs into '${r.collection}'`)
-              .join(", "),
-          };
-        },
-      }),
-
-      listCollections: tool({
-        description:
-          "List all user collections in the connected database with their type (document/edge) and document count. Call this to discover what already exists before creating or seeding.",
-        parameters: z.object({}),
-        execute: async () => {
-          const collections = await listCollections(creds);
-          const vertices = collections.filter((c) => c.type === "document");
-          const edges = collections.filter((c) => c.type === "edge");
-          return {
-            success: true,
-            total: collections.length,
-            vertices: vertices.length,
-            edges: edges.length,
-            collections,
-            summary:
-              collections.length === 0
-                ? "Database is empty — no user collections found"
-                : `Found ${collections.length} collection(s): ${collections.map((c) => `${c.name} (${c.type}, ${c.count} docs)`).join(", ")}`,
-          };
+          try {
+            const results = await seedSyntheticData(
+              creds,
+              collections,
+              documentsPerCollection
+            );
+            return {
+              success: true,
+              results,
+              summary: results
+                .map((r) => `Seeded ${r.inserted} docs into '${r.collection}'`)
+                .join(", "),
+            };
+          } catch (err) {
+            return toolError("seedSyntheticData", err);
+          }
         },
       }),
 
@@ -149,18 +171,22 @@ export async function POST(req: Request) {
             .describe("Optional bind variables for parameterized queries"),
         }),
         execute: async ({ aql: rawAql, description, bindVars }) => {
-          const result = await executeSampleQuery(
-            creds,
-            rawAql,
-            bindVars ?? {}
-          );
-          return {
-            success: true,
-            description,
-            aql: rawAql,
-            count: result.count,
-            sample: result.results.slice(0, 5),
-          };
+          try {
+            const result = await executeSampleQuery(
+              creds,
+              rawAql,
+              bindVars ?? {}
+            );
+            return {
+              success: true,
+              description,
+              aql: rawAql,
+              count: result.count,
+              sample: result.results.slice(0, 5),
+            };
+          } catch (err) {
+            return toolError("executeSampleQuery", err);
+          }
         },
       }),
     },

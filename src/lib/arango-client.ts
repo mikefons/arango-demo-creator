@@ -7,6 +7,8 @@ import type {
   ConnectionStatus,
 } from "@/types";
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 function buildClient(creds: ArangoCredentials): Database {
   return new Database({
     url: creds.url,
@@ -15,12 +17,29 @@ function buildClient(creds: ArangoCredentials): Database {
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `${label} timed out after ${REQUEST_TIMEOUT_MS}ms — check your ArangoGraph endpoint and credentials`
+            )
+          ),
+        REQUEST_TIMEOUT_MS
+      )
+    ),
+  ]);
+}
+
 export async function testConnection(
   creds: ArangoCredentials
 ): Promise<ConnectionStatus> {
   const db = buildClient(creds);
   try {
-    const info = await db.version();
+    const info = await withTimeout(db.version(), "testConnection");
     return {
       connected: true,
       version: info.version,
@@ -43,24 +62,28 @@ export async function createCollections(
   const db = buildClient(creds);
 
   try {
-    // Check all existence in parallel — one round trip per collection simultaneously
-    const existenceChecks = await Promise.all(
-      collections.map((def) => db.collection(def.name).exists())
+    // Check all existence in parallel
+    const existenceChecks = await withTimeout(
+      Promise.all(collections.map((def) => db.collection(def.name).exists())),
+      "createCollections:exists"
     );
 
-    // Create only the missing ones, again in parallel
-    const results = await Promise.all(
-      collections.map(async (def, i) => {
-        if (!existenceChecks[i]) {
-          if (def.type === "edge") {
-            await db.createEdgeCollection(def.name);
-          } else {
-            await db.createCollection(def.name);
+    // Create only the missing ones, in parallel
+    const results = await withTimeout(
+      Promise.all(
+        collections.map(async (def, i) => {
+          if (!existenceChecks[i]) {
+            if (def.type === "edge") {
+              await db.createEdgeCollection(def.name);
+            } else {
+              await db.createCollection(def.name);
+            }
+            return { name: def.name, type: def.type, created: true };
           }
-          return { name: def.name, type: def.type, created: true };
-        }
-        return { name: def.name, type: def.type, created: false };
-      })
+          return { name: def.name, type: def.type, created: false };
+        })
+      ),
+      "createCollections:create"
     );
 
     return results;
@@ -114,14 +137,17 @@ export async function seedSyntheticData(
 
   try {
     for (const def of collections) {
-      if (def.type === "edge") continue; // edge seeding handled separately
+      if (def.type === "edge") continue;
 
       const docs = Array.from({ length: documentsPerCollection }, (_, i) =>
         buildSyntheticDocument(def, i)
       );
 
       const collection = db.collection(def.name);
-      await collection.import(docs, { onDuplicate: "ignore" });
+      await withTimeout(
+        collection.import(docs, { onDuplicate: "ignore" }),
+        `seedSyntheticData:import:${def.name}`
+      );
 
       results.push({
         collection: def.name,
@@ -135,23 +161,28 @@ export async function seedSyntheticData(
       if (def.type !== "edge") continue;
 
       const edgeCol = db.collection(def.name);
-
-      // Pull keys from vertex collections to build realistic edges
       const vertexCollections = collections.filter((c) => c.type === "document");
       if (vertexCollections.length < 2) continue;
 
       const fromCol = vertexCollections[0];
       const toCol = vertexCollections[1];
 
-      const fromCursor = await db.query<{ _id: string }>(
-        aql`FOR v IN ${db.collection(fromCol.name)} LIMIT 20 RETURN { _id: v._id }`
-      );
-      const tosCursor = await db.query<{ _id: string }>(
-        aql`FOR v IN ${db.collection(toCol.name)} LIMIT 20 RETURN { _id: v._id }`
+      const [fromCursor, tosCursor] = await withTimeout(
+        Promise.all([
+          db.query<{ _id: string }>(
+            aql`FOR v IN ${db.collection(fromCol.name)} LIMIT 20 RETURN { _id: v._id }`
+          ),
+          db.query<{ _id: string }>(
+            aql`FOR v IN ${db.collection(toCol.name)} LIMIT 20 RETURN { _id: v._id }`
+          ),
+        ]),
+        `seedSyntheticData:edgeKeys:${def.name}`
       );
 
-      const fromDocs = await fromCursor.all();
-      const tosDocs = await tosCursor.all();
+      const [fromDocs, tosDocs] = await Promise.all([
+        fromCursor.all(),
+        tosCursor.all(),
+      ]);
 
       const edgeDocs = fromDocs.slice(0, 10).map((f, i) => ({
         _from: f._id,
@@ -159,7 +190,10 @@ export async function seedSyntheticData(
         ...buildSyntheticDocument(def, i),
       }));
 
-      await edgeCol.import(edgeDocs, { onDuplicate: "ignore" });
+      await withTimeout(
+        edgeCol.import(edgeDocs, { onDuplicate: "ignore" }),
+        `seedSyntheticData:edgeImport:${def.name}`
+      );
 
       results.push({
         collection: def.name,
@@ -185,16 +219,22 @@ export async function listCollections(
 ): Promise<CollectionSummary[]> {
   const db = buildClient(creds);
   try {
-    const cols = await db.listCollections(true);
-    const summaries = await Promise.all(
-      cols.map(async (col) => {
-        const count = await db.collection(col.name).count();
-        return {
-          name: col.name,
-          type: col.type === 3 ? ("edge" as const) : ("document" as const),
-          count: count.count,
-        };
-      })
+    const cols = await withTimeout(
+      db.listCollections(true),
+      "listCollections"
+    );
+    const summaries = await withTimeout(
+      Promise.all(
+        cols.map(async (col) => {
+          const count = await db.collection(col.name).count();
+          return {
+            name: col.name,
+            type: col.type === 3 ? ("edge" as const) : ("document" as const),
+            count: count.count,
+          };
+        })
+      ),
+      "listCollections:counts"
     );
     return summaries.sort((a, b) => a.name.localeCompare(b.name));
   } finally {
@@ -207,7 +247,6 @@ export async function executeSampleQuery(
   rawAql: string,
   bindVars: Record<string, unknown> = {}
 ): Promise<QueryResult> {
-  // Validate: only allow SELECT-style operations — block mutating keywords
   const normalized = rawAql.trim().toUpperCase();
   const forbidden = ["INSERT", "UPDATE", "REPLACE", "REMOVE", "UPSERT", "DROP"];
   for (const kw of forbidden) {
@@ -220,10 +259,11 @@ export async function executeSampleQuery(
 
   const db = buildClient(creds);
   try {
-    const cursor = await db.query<Record<string, unknown>>(rawAql, bindVars, {
-      count: true,
-    });
-    const results = await cursor.all();
+    const cursor = await withTimeout(
+      db.query<Record<string, unknown>>(rawAql, bindVars, { count: true }),
+      "executeSampleQuery"
+    );
+    const results = await withTimeout(cursor.all(), "executeSampleQuery:fetch");
     return {
       aql: rawAql,
       description: "Sample traversal result",
