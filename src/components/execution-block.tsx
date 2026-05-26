@@ -183,9 +183,9 @@ function SeedResult({ d }: { d: Record<string, unknown> }) {
 }
 
 function CollectionsResult({ d }: { d: Record<string, unknown> }) {
-  // createCollections result
-  if (Array.isArray(d.results)) {
-    const results = d.results as Array<{ name: string; type: string; created: boolean }>;
+  // createCollections result (tool returns `created` array)
+  if (Array.isArray(d.created)) {
+    const results = d.created as Array<{ name: string; type: string; created: boolean }>;
     return (
       <div className="px-3 pb-3 pt-2 space-y-1">
         {results.map((r) => (

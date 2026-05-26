@@ -197,49 +197,54 @@ export async function seedSyntheticData(
     results.push(...vertexResults);
 
     // Seed edges: link vertex collections pairwise
-    for (const def of collections) {
-      if (def.type !== "edge") continue;
+    const vertexCollections = collections.filter((c) => c.type === "document");
+    const edgeCollections = collections.filter((c) => c.type === "edge");
 
-      const edgeCol = db.collection(def.name);
-      const vertexCollections = collections.filter((c) => c.type === "document");
-      if (vertexCollections.length < 2) continue;
+    if (vertexCollections.length >= 1 && edgeCollections.length > 0) {
+      const edgeResults = await Promise.all(
+        edgeCollections.map(async (def, edgeIdx) => {
+          const n = vertexCollections.length;
+          // Rotate which vertex pair each edge collection connects
+          const fromCol = vertexCollections[edgeIdx % n];
+          const toCol = vertexCollections[(edgeIdx + 1) % n];
 
-      const fromCol = vertexCollections[0];
-      const toCol = vertexCollections[1];
+          const limit = documentsPerCollection;
+          const [fromCursor, toCursor] = await withTimeout(
+            Promise.all([
+              db.query<{ _id: string }>(
+                aql`FOR v IN ${db.collection(fromCol.name)} LIMIT ${limit} RETURN { _id: v._id }`
+              ),
+              db.query<{ _id: string }>(
+                aql`FOR v IN ${db.collection(toCol.name)} LIMIT ${limit} RETURN { _id: v._id }`
+              ),
+            ]),
+            `seedSyntheticData:edgeKeys:${def.name}`
+          );
 
-      const [fromCursor, tosCursor] = await withTimeout(
-        Promise.all([
-          db.query<{ _id: string }>(
-            aql`FOR v IN ${db.collection(fromCol.name)} LIMIT 20 RETURN { _id: v._id }`
-          ),
-          db.query<{ _id: string }>(
-            aql`FOR v IN ${db.collection(toCol.name)} LIMIT 20 RETURN { _id: v._id }`
-          ),
-        ]),
-        `seedSyntheticData:edgeKeys:${def.name}`
+          const [fromDocs, toDocs] = await Promise.all([
+            fromCursor.all(),
+            toCursor.all(),
+          ]);
+
+          if (fromDocs.length === 0 || toDocs.length === 0) return null;
+
+          const edgeDocs = fromDocs.map((f, i) => ({
+            _from: f._id,
+            _to: toDocs[i % toDocs.length]._id,
+            ...buildSyntheticDocument(def, i),
+          }));
+
+          const edgeCol = db.collection(def.name);
+          await withTimeout(
+            edgeCol.import(edgeDocs, { onDuplicate: "ignore" }),
+            `seedSyntheticData:edgeImport:${def.name}`
+          );
+
+          return { collection: def.name, inserted: edgeDocs.length, sample: edgeDocs.slice(0, 3) };
+        })
       );
 
-      const [fromDocs, tosDocs] = await Promise.all([
-        fromCursor.all(),
-        tosCursor.all(),
-      ]);
-
-      const edgeDocs = fromDocs.slice(0, 10).map((f, i) => ({
-        _from: f._id,
-        _to: tosDocs[i % tosDocs.length]._id,
-        ...buildSyntheticDocument(def, i),
-      }));
-
-      await withTimeout(
-        edgeCol.import(edgeDocs, { onDuplicate: "ignore" }),
-        `seedSyntheticData:edgeImport:${def.name}`
-      );
-
-      results.push({
-        collection: def.name,
-        inserted: edgeDocs.length,
-        sample: edgeDocs.slice(0, 3),
-      });
+      results.push(...edgeResults.filter((r): r is NonNullable<typeof r> => r !== null));
     }
   } finally {
     db.close();
