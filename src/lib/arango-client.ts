@@ -98,34 +98,70 @@ export async function createCollections(
   }
 }
 
+// Small word pools for varied synthetic strings when no example is provided
+const FIRST_NAMES = ["Alice","Bob","Carlos","Diana","Ethan","Fatima","George","Hannah","Ivan","Julia","Kevin","Lena","Marco","Nina","Oscar","Priya","Quinn","Rafael","Sara","Tom","Uma","Victor","Wendy","Xia","Yusuf","Zoe"];
+const LAST_NAMES = ["Smith","Garcia","Chen","Patel","Kim","Nguyen","Johnson","Williams","Brown","Davis","Miller","Wilson","Moore","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin"];
+const CITIES = ["New York","London","Tokyo","Paris","Sydney","Berlin","Toronto","Dubai","Seoul","São Paulo","Mumbai","Lagos","Singapore","Cairo","Mexico City","Bangkok","Istanbul","Jakarta","Moscow","Buenos Aires"];
+const COMPANIES = ["Acme Corp","Globex","Initech","Umbrella Ltd","Soylent Inc","Hooli","Dunder Mifflin","Pied Piper","Waystar","Prestige Worldwide"];
+const ADJECTIVES = ["fast","smart","robust","scalable","elegant","dynamic","reliable","modern","efficient","powerful"];
+const NOUNS = ["system","platform","engine","framework","service","pipeline","module","cluster","network","graph"];
+
+function deterministicPick<T>(arr: T[], index: number): T {
+  return arr[index % arr.length];
+}
+
 function buildSyntheticDocument(
   def: CollectionDefinition,
   index: number
 ): Record<string, unknown> {
   const doc: Record<string, unknown> = {};
+  const nameLower = def.name.toLowerCase();
 
   for (const attr of def.attributes) {
+    const attrLower = attr.name.toLowerCase();
     switch (attr.type) {
-      case "string":
-        doc[attr.name] =
-          attr.example !== undefined
-            ? String(attr.example).replace(/\d+$/, String(index + 1))
-            : `${attr.name}_${index + 1}`;
+      case "string": {
+        if (attr.example !== undefined) {
+          // Use example as a template, vary the numeric suffix
+          doc[attr.name] = String(attr.example).replace(/\d+$/, String(index + 1));
+        } else if (attrLower.includes("first") || attrLower === "firstname" || attrLower === "given_name") {
+          doc[attr.name] = deterministicPick(FIRST_NAMES, index);
+        } else if (attrLower.includes("last") || attrLower === "lastname" || attrLower === "surname" || attrLower === "family_name") {
+          doc[attr.name] = deterministicPick(LAST_NAMES, index);
+        } else if (attrLower === "name" && (nameLower.includes("user") || nameLower.includes("person") || nameLower.includes("employee") || nameLower.includes("customer"))) {
+          doc[attr.name] = `${deterministicPick(FIRST_NAMES, index)} ${deterministicPick(LAST_NAMES, index + 3)}`;
+        } else if (attrLower === "name" && (nameLower.includes("company") || nameLower.includes("org") || nameLower.includes("vendor"))) {
+          doc[attr.name] = deterministicPick(COMPANIES, index);
+        } else if (attrLower.includes("city") || attrLower.includes("location") || attrLower.includes("place")) {
+          doc[attr.name] = deterministicPick(CITIES, index);
+        } else if (attrLower.includes("email")) {
+          const first = deterministicPick(FIRST_NAMES, index).toLowerCase();
+          const last = deterministicPick(LAST_NAMES, index + 2).toLowerCase();
+          doc[attr.name] = `${first}.${last}${index + 1}@example.com`;
+        } else if (attrLower.includes("title") || attrLower.includes("label")) {
+          doc[attr.name] = `${deterministicPick(ADJECTIVES, index)} ${deterministicPick(NOUNS, index + 1)}`;
+        } else {
+          doc[attr.name] = `${attr.name}_${index + 1}`;
+        }
         break;
+      }
       case "number":
         doc[attr.name] =
           attr.example !== undefined
-            ? Number(attr.example) + index
+            ? Math.round((Number(attr.example) + index) * 10) / 10
             : index + 1;
         break;
       case "boolean":
-        doc[attr.name] = index % 2 === 0;
+        doc[attr.name] = index % 3 !== 0; // 2/3 true, 1/3 false — more realistic than 50/50
         break;
       case "array":
-        doc[attr.name] = [`item_${index + 1}_a`, `item_${index + 1}_b`];
+        doc[attr.name] = [
+          deterministicPick(ADJECTIVES, index),
+          deterministicPick(ADJECTIVES, index + 2),
+        ];
         break;
       case "object":
-        doc[attr.name] = { id: index + 1, label: `label_${index + 1}` };
+        doc[attr.name] = { id: index + 1, value: deterministicPick(NOUNS, index) };
         break;
     }
   }

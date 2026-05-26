@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "ai/react";
 import {
   Send,
@@ -394,45 +394,159 @@ export function ChatInterface({
   );
 }
 
-function MarkdownMessage({ content }: { content: string }) {
-  const lines = content.split("\n");
-  let inCodeBlock = false;
-  const codeLines: string[] = [];
-  const parts: React.ReactNode[] = [];
-  let key = 0;
+// ── Markdown renderer ────────────────────────────────────────────────────────
 
-  for (const line of lines) {
+type MdNode =
+  | { kind: "code"; lang: string; lines: string[] }
+  | { kind: "heading"; level: number; text: string }
+  | { kind: "bullet"; text: string }
+  | { kind: "ordered"; text: string }
+  | { kind: "divider" }
+  | { kind: "text"; text: string };
+
+function parseMarkdown(content: string): MdNode[] {
+  const raw = content.split("\n");
+  const nodes: MdNode[] = [];
+  let i = 0;
+
+  while (i < raw.length) {
+    const line = raw[i];
+
     if (line.startsWith("```")) {
-      if (inCodeBlock) {
-        parts.push(
-          <pre
-            key={key++}
-            className="mt-2 mb-2 text-[11px] bg-background rounded-md p-3 overflow-x-auto border border-border text-arango-300 leading-relaxed"
-          >
-            {codeLines.join("\n")}
-          </pre>
-        );
-        codeLines.length = 0;
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < raw.length && !raw[i].startsWith("```")) {
+        codeLines.push(raw[i]);
+        i++;
       }
-    } else if (inCodeBlock) {
-      codeLines.push(line);
-    } else {
-      parts.push(
-        <p key={key++} className="leading-relaxed">
-          {renderInline(line)}
-        </p>
-      );
+      nodes.push({ kind: "code", lang, lines: codeLines });
+      i++;
+      continue;
     }
+
+    const hMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (hMatch) {
+      nodes.push({ kind: "heading", level: hMatch[1].length, text: hMatch[2] });
+      i++;
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      nodes.push({ kind: "bullet", text: line.replace(/^[-*]\s+/, "") });
+      i++;
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      nodes.push({ kind: "ordered", text: line.replace(/^\d+\.\s+/, "") });
+      i++;
+      continue;
+    }
+
+    if (/^---+$/.test(line.trim())) {
+      nodes.push({ kind: "divider" });
+      i++;
+      continue;
+    }
+
+    nodes.push({ kind: "text", text: line });
+    i++;
   }
 
-  return <div className="space-y-1">{parts}</div>;
+  return nodes;
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const nodes = useMemo(() => parseMarkdown(content), [content]);
+  const elements: React.ReactNode[] = [];
+  let key = 0;
+  let j = 0;
+
+  while (j < nodes.length) {
+    const node = nodes[j];
+
+    // Group consecutive bullet items into a <ul>
+    if (node.kind === "bullet") {
+      const items: string[] = [];
+      while (j < nodes.length && nodes[j].kind === "bullet") {
+        items.push((nodes[j] as { kind: "bullet"; text: string }).text);
+        j++;
+      }
+      elements.push(
+        <ul key={key++} className="list-disc list-inside space-y-0.5 pl-1">
+          {items.map((item, idx) => (
+            <li key={idx} className="text-sm leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Group consecutive ordered items into an <ol>
+    if (node.kind === "ordered") {
+      const items: string[] = [];
+      while (j < nodes.length && nodes[j].kind === "ordered") {
+        items.push((nodes[j] as { kind: "ordered"; text: string }).text);
+        j++;
+      }
+      elements.push(
+        <ol key={key++} className="list-decimal list-inside space-y-0.5 pl-1">
+          {items.map((item, idx) => (
+            <li key={idx} className="text-sm leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    if (node.kind === "code") {
+      elements.push(
+        <pre
+          key={key++}
+          className="mt-1 mb-1 text-[11px] bg-background rounded-md p-3 overflow-x-auto border border-border text-arango-300 leading-relaxed"
+        >
+          {node.lines.join("\n")}
+        </pre>
+      );
+    } else if (node.kind === "heading") {
+      const cls =
+        node.level === 1
+          ? "text-base font-bold text-white mt-1"
+          : node.level === 2
+          ? "text-sm font-semibold text-slate-100 mt-1"
+          : "text-xs font-semibold text-slate-300 uppercase tracking-wide mt-1";
+      elements.push(
+        <p key={key++} className={cls}>
+          {renderInline(node.text)}
+        </p>
+      );
+    } else if (node.kind === "divider") {
+      elements.push(<hr key={key++} className="border-border my-1" />);
+    } else {
+      // plain text — skip blank lines silently, render others
+      if (node.text.trim()) {
+        elements.push(
+          <p key={key++} className="leading-relaxed text-sm">
+            {renderInline(node.text)}
+          </p>
+        );
+      }
+    }
+
+    j++;
+  }
+
+  return <div className="space-y-1">{elements}</div>;
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(`[^`]+`)/g);
+  // Split on: `code`, **bold**, *italic*
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
@@ -443,6 +557,12 @@ function renderInline(text: string): React.ReactNode {
           {part.slice(1, -1)}
         </code>
       );
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={i} className="italic text-slate-300">{part.slice(1, -1)}</em>;
     }
     return part;
   });
