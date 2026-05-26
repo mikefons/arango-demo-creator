@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { validateAndEncryptCredentials } from "@/app/actions";
-import type { ArangoCredentials } from "@/types";
+import type { ArangoCredentials, ConnectionStatus } from "@/types";
 
 interface CredentialFormProps {
   onSuccess: (token: string) => void;
@@ -30,6 +30,7 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
   );
   const [formState, setFormState] = useState<FormState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [connectedStatus, setConnectedStatus] = useState<ConnectionStatus | null>(null);
   const [fields, setFields] = useState<ArangoCredentials>({
     url: "",
     username: "root",
@@ -58,19 +59,27 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
 
     setFormState("validating");
     setErrorMsg("");
+    setConnectedStatus(null);
 
     try {
-      const { token } = await validateAndEncryptCredentials(fields);
+      const { token, status } = await validateAndEncryptCredentials(fields);
+      setConnectedStatus(status);
       setFormState("success");
-      setTimeout(() => onSuccess(token), 600);
+      setTimeout(() => onSuccess(token), 2000);
     } catch (err) {
       setFormState("error");
       setErrorMsg(
         err instanceof Error
           ? err.message
-          : "Connection failed. Check your credentials."
+          : "Connection failed. Check your credentials and try again."
       );
     }
+  }
+
+  function handleRetry() {
+    setFormState("idle");
+    setErrorMsg("");
+    setConnectedStatus(null);
   }
 
   function update(field: keyof ArangoCredentials, value: string) {
@@ -315,18 +324,68 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
               </div>
 
               {formState === "error" && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-red-900/20 border border-red-800/40">
-                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{errorMsg}</p>
+                <div className="rounded-xl border border-red-800/50 bg-red-900/20 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-red-900/30 border-b border-red-800/40">
+                    <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <p className="text-sm font-semibold text-red-400">
+                      Connection failed
+                    </p>
+                  </div>
+                  <div className="px-4 py-3 space-y-3">
+                    <p className="text-sm text-red-300 leading-relaxed">
+                      {errorMsg}
+                    </p>
+                    <ul className="text-xs text-red-400/80 space-y-1 list-disc list-inside">
+                      <li>Verify your endpoint URL includes the port (e.g. :8529)</li>
+                      <li>Check your username and password are correct</li>
+                      <li>Confirm the database name exists on your instance</li>
+                    </ul>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRetry}
+                      className="w-full mt-1"
+                    >
+                      Try again
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {formState === "success" && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-arango-400/10 border border-arango-400/30">
-                  <CheckCircle2 className="w-4 h-4 text-arango-400" />
-                  <p className="text-sm text-arango-400">
-                    Connected — launching workspace...
-                  </p>
+              {formState === "success" && connectedStatus && (
+                <div className="rounded-xl border border-arango-400/40 bg-arango-400/10 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-arango-400/20 border-b border-arango-400/30">
+                    <CheckCircle2 className="w-4 h-4 text-arango-400 flex-shrink-0" />
+                    <p className="text-sm font-semibold text-arango-400">
+                      Successfully connected
+                    </p>
+                  </div>
+                  <div className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted">Database</span>
+                      <span className="font-mono text-arango-300">
+                        {connectedStatus.database}
+                      </span>
+                    </div>
+                    {connectedStatus.version && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted">ArangoDB version</span>
+                        <span className="font-mono text-arango-300">
+                          v{connectedStatus.version}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted">Endpoint</span>
+                      <span className="font-mono text-arango-300 truncate max-w-[180px]">
+                        {fields.url}
+                      </span>
+                    </div>
+                    <p className="text-xs text-arango-400/70 pt-1">
+                      Launching workspace...
+                    </p>
+                  </div>
                 </div>
               )}
 
