@@ -12,6 +12,7 @@ import {
   Search,
   Sparkles,
   StopCircle,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -59,7 +60,7 @@ export function ChatInterface({
     []
   );
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, append } =
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, append, error } =
     useChat({
       api: "/api/chat",
       onError: (err) => {
@@ -343,6 +344,19 @@ export function ChatInterface({
                       />
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+          {error &&
+            !error.message.includes("401") &&
+            !error.message.includes("Missing session") &&
+            !error.message.includes("Session expired") && (
+              <div className="flex gap-3 animate-slide-up">
+                <div className="w-7 h-7 rounded-lg bg-red-900/20 border border-red-800/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                </div>
+                <div className="bg-red-900/10 border border-red-800/30 rounded-xl px-4 py-2.5 text-xs text-red-300 max-w-[80%]">
+                  {error.message}
                 </div>
               </div>
             )}

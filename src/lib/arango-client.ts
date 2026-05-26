@@ -154,15 +154,29 @@ function buildSyntheticDocument(
       case "boolean":
         doc[attr.name] = index % 3 !== 0; // 2/3 true, 1/3 false — more realistic than 50/50
         break;
-      case "array":
+      case "array": {
+        if (typeof attr.example === "string" && attr.example.trim().startsWith("[")) {
+          try {
+            const parsed = JSON.parse(attr.example);
+            if (Array.isArray(parsed)) { doc[attr.name] = parsed; break; }
+          } catch { /* fall through */ }
+        }
         doc[attr.name] = [
           deterministicPick(ADJECTIVES, index),
           deterministicPick(ADJECTIVES, index + 2),
         ];
         break;
-      case "object":
+      }
+      case "object": {
+        if (typeof attr.example === "string" && attr.example.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(attr.example);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) { doc[attr.name] = parsed; break; }
+          } catch { /* fall through */ }
+        }
         doc[attr.name] = { id: index + 1, value: deterministicPick(NOUNS, index) };
         break;
+      }
     }
   }
 

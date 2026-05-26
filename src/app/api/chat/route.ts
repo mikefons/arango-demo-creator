@@ -65,6 +65,12 @@ export async function POST(req: Request) {
     system: GRAPH_MODELER_SYSTEM_PROMPT,
     messages: messages as Parameters<typeof streamText>[0]["messages"],
     maxSteps: 10,
+    // Retry up to 3 times (4 total attempts) with exponential backoff.
+    // Covers transient Anthropic errors: 429 rate-limit, 503/529 overloaded.
+    maxRetries: 3,
+    onError: ({ error }) => {
+      console.error("[chat/route] streamText error:", error);
+    },
     tools: {
       listCollections: tool({
         description:
