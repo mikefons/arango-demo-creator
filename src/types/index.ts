@@ -18,7 +18,7 @@ export interface AttributeDefinition {
   type: "string" | "number" | "boolean" | "array" | "object";
   description: string;
   required: boolean;
-  example?: string | number | boolean;
+  example?: string | number | boolean | unknown[] | Record<string, unknown>;
 }
 
 export interface EdgeDefinition {

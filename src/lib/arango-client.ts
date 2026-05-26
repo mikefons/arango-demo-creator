@@ -190,6 +190,10 @@ function buildSyntheticDocument(
         doc[attr.name] = index % 3 !== 0; // 2/3 true, 1/3 false — more realistic than 50/50
         break;
       case "array": {
+        if (Array.isArray(attr.example)) {
+          doc[attr.name] = attr.example;
+          break;
+        }
         if (typeof attr.example === "string" && attr.example.trim().startsWith("[")) {
           try {
             const parsed = JSON.parse(attr.example);
@@ -203,6 +207,10 @@ function buildSyntheticDocument(
         break;
       }
       case "object": {
+        if (attr.example && typeof attr.example === "object" && !Array.isArray(attr.example)) {
+          doc[attr.name] = attr.example;
+          break;
+        }
         if (typeof attr.example === "string" && attr.example.trim().startsWith("{")) {
           try {
             const parsed = JSON.parse(attr.example);

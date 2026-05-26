@@ -20,7 +20,7 @@ const AttributeSchema = z.object({
   description: z.string(),
   required: z.boolean(),
   example: z
-    .union([z.string(), z.number(), z.boolean()])
+    .union([z.string(), z.number(), z.boolean(), z.array(z.unknown()), z.record(z.unknown())])
     .optional()
     .describe("A realistic example value for this attribute"),
 });
