@@ -142,25 +142,23 @@ export async function seedSyntheticData(
   const results: SeedResult[] = [];
 
   try {
-    for (const def of collections) {
-      if (def.type === "edge") continue;
-
-      const docs = Array.from({ length: documentsPerCollection }, (_, i) =>
-        buildSyntheticDocument(def, i)
-      );
-
-      const collection = db.collection(def.name);
-      await withTimeout(
-        collection.import(docs, { onDuplicate: "ignore" }),
-        `seedSyntheticData:import:${def.name}`
-      );
-
-      results.push({
-        collection: def.name,
-        inserted: docs.length,
-        sample: docs.slice(0, 3),
-      });
-    }
+    // Seed vertex collections in parallel
+    const vertexResults = await Promise.all(
+      collections
+        .filter((def) => def.type !== "edge")
+        .map(async (def) => {
+          const docs = Array.from({ length: documentsPerCollection }, (_, i) =>
+            buildSyntheticDocument(def, i)
+          );
+          const collection = db.collection(def.name);
+          await withTimeout(
+            collection.import(docs, { onDuplicate: "ignore" }),
+            `seedSyntheticData:import:${def.name}`
+          );
+          return { collection: def.name, inserted: docs.length, sample: docs.slice(0, 3) };
+        })
+    );
+    results.push(...vertexResults);
 
     // Seed edges: link vertex collections pairwise
     for (const def of collections) {

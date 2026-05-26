@@ -133,9 +133,9 @@ export async function POST(req: Request) {
           documentsPerCollection: z
             .number()
             .min(5)
-            .max(100)
+            .max(50)
             .default(20)
-            .describe("Number of documents to insert per vertex collection"),
+            .describe("Number of documents to insert per vertex collection (max 50)"),
         }),
         execute: async ({ collections, documentsPerCollection }) => {
           try {
