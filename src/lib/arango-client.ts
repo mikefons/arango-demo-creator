@@ -387,13 +387,34 @@ export async function executeSampleQuery(
 
   const db = buildClient(creds);
   try {
+    // ArangoGraph cluster traversals require a WITH clause listing every vertex
+    // collection that might be visited — otherwise remote shards don't participate
+    // and ArangoDB throws "collection not known to traversal". Auto-prepend it
+    // from the live collection list whenever the query has traversal syntax and
+    // the clause is absent.
+    let aql = rawAql.trim();
+    const isTraversal = /\b(OUTBOUND|INBOUND|ANY)\b/i.test(aql);
+    const hasWithClause = /^WITH\s/i.test(aql);
+
+    if (isTraversal && !hasWithClause) {
+      const cols = await withTimeout(
+        db.listCollections(true),
+        "executeSampleQuery:listCollections"
+      );
+      // type 3 = edge collection; everything else is a vertex (document) collection
+      const vertexNames = cols.filter((c) => c.type !== 3).map((c) => c.name);
+      if (vertexNames.length > 0) {
+        aql = `WITH ${vertexNames.join(", ")}\n${aql}`;
+      }
+    }
+
     const cursor = await withTimeout(
-      db.query<Record<string, unknown>>(rawAql, bindVars, { count: true }),
+      db.query<Record<string, unknown>>(aql, bindVars, { count: true }),
       "executeSampleQuery"
     );
     const results = await withTimeout(cursor.all(), "executeSampleQuery:fetch");
     return {
-      aql: rawAql,
+      aql,
       description: "Sample traversal result",
       results,
       count: results.length,

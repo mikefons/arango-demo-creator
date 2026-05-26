@@ -34,11 +34,13 @@ AQL queries must be read-only. Never emit INSERT, UPDATE, REPLACE, REMOVE, or UP
 
 Graph traversal syntax:
 \`\`\`aql
+WITH vertexCollection1, vertexCollection2
 FOR vertex, edge, path IN min..max OUTBOUND startVertex edgeCollectionName
   FILTER vertex.someField == @value
   RETURN { vertex, edge }
 \`\`\`
 
+- **Always start traversal queries with \`WITH\` listing every vertex collection in the schema.** ArangoGraph runs on a cluster; without this clause the query will fail with "collection not known to traversal".
 - Use \`OUTBOUND\`, \`INBOUND\`, or \`ANY\` for traversal direction.
 - Use bind variables (\`@param\`) for any user-supplied filter values.
 - Limit result sets with \`LIMIT\` when collections are large.
