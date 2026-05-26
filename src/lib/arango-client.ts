@@ -9,6 +9,41 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+// ArangoGraph's load balancer rejects Transfer-Encoding: chunked.
+// arangojs v9 wraps every request body in `new Request(url, { body })`, which
+// causes Node.js/undici to store the body as a ReadableStream internally.
+// When fetch later reads that stream it has no known length, so it falls back
+// to chunked encoding. We patch globalThis.fetch once at module load to
+// intercept Request-object calls, drain the body into a Buffer, and rebuild
+// the request with an explicit Content-Length header. This is safe in Vercel
+// serverless because each function invocation gets a fresh process.
+(function patchFetchForArangoGraph() {
+  const orig = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = async function (
+    input: RequestInfo | URL,
+    init?: RequestInit
+  ): Promise<Response> {
+    if (input instanceof Request && input.body) {
+      const buf = await input.arrayBuffer();
+      const headers = new Headers(input.headers);
+      if (!headers.has("content-length")) {
+        headers.set("content-length", String(buf.byteLength));
+      }
+      return orig(
+        new Request(input.url, {
+          method: input.method,
+          headers,
+          body: buf,
+          credentials: input.credentials,
+          keepalive: input.keepalive,
+        }),
+        init
+      );
+    }
+    return orig(input, init);
+  };
+})();
+
 function buildClient(creds: ArangoCredentials): Database {
   // keepalive defaults to true in arangojs v9 — it is passed directly
   // into the native fetch call. On Vercel serverless each invocation is
