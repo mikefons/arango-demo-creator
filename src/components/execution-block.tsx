@@ -106,7 +106,7 @@ function BlockResult({ type, data }: { type: ExecutionBlockType["type"]; data: u
 
   if (type === "query") return <QueryResult d={d} />;
   if (type === "seed") return <SeedResult d={d} />;
-  if (type === "collections") return <CollectionsResult d={d} />;
+  if (type === "collections" || type === "drop") return <CollectionsResult d={d} />;
 
   // Fallback: compact JSON
   return (
@@ -119,44 +119,53 @@ function BlockResult({ type, data }: { type: ExecutionBlockType["type"]; data: u
 function QueryResult({ d }: { d: Record<string, unknown> }) {
   const sample = Array.isArray(d.sample) ? (d.sample as Record<string, unknown>[]) : [];
   const count = typeof d.count === "number" ? d.count : sample.length;
+  const aql = typeof d.aql === "string" ? d.aql.trim() : null;
 
-  if (sample.length === 0) {
-    return (
-      <p className="px-3 pb-3 pt-2 text-xs text-muted">No results returned.</p>
-    );
-  }
-
-  const keys = Object.keys(sample[0]).filter((k) => !k.startsWith("_") || k === "_id");
+  // Show _id, _from, _to — hide only ArangoDB-internal metadata
+  const HIDDEN = new Set(["_key", "_rev"]);
+  const keys = sample.length > 0 ? Object.keys(sample[0]).filter((k) => !HIDDEN.has(k)) : [];
 
   return (
-    <div className="px-3 pb-3 pt-2">
-      <p className="text-[10px] text-muted mb-2">
-        {count} result{count !== 1 ? "s" : ""}{count > sample.length ? ` — showing first ${sample.length}` : ""}
-      </p>
-      <div className="overflow-x-auto rounded border border-border">
-        <table className="w-full text-[10px] font-mono">
-          <thead>
-            <tr className="bg-background-tertiary border-b border-border">
-              {keys.map((k) => (
-                <th key={k} className="px-2 py-1.5 text-left text-muted font-semibold whitespace-nowrap">
-                  {k}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sample.map((row, i) => (
-              <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-background-secondary"}>
-                {keys.map((k) => (
-                  <td key={k} className="px-2 py-1.5 text-arango-300 whitespace-nowrap max-w-[140px] truncate">
-                    {formatCell(row[k])}
-                  </td>
+    <div className="px-3 pb-3 pt-2 space-y-2">
+      {aql && (
+        <pre className="text-[10px] font-mono bg-background border border-border rounded-md p-2 overflow-x-auto text-arango-300 leading-relaxed">
+          {aql}
+        </pre>
+      )}
+      {sample.length === 0 ? (
+        <p className="text-xs text-muted">No results returned.</p>
+      ) : (
+        <>
+          <p className="text-[10px] text-muted">
+            {count} result{count !== 1 ? "s" : ""}
+            {count > sample.length ? ` — showing first ${sample.length}` : ""}
+          </p>
+          <div className="overflow-x-auto rounded border border-border">
+            <table className="w-full text-[10px] font-mono">
+              <thead>
+                <tr className="bg-background-tertiary border-b border-border">
+                  {keys.map((k) => (
+                    <th key={k} className="px-2 py-1.5 text-left text-muted font-semibold whitespace-nowrap">
+                      {k}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sample.map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-background-secondary"}>
+                    {keys.map((k) => (
+                      <td key={k} className="px-2 py-1.5 text-arango-300 whitespace-nowrap max-w-[140px] truncate">
+                        {formatCell(row[k])}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
