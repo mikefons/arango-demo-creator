@@ -1,48 +1,31 @@
+import { cookies } from "next/headers";
 import { decryptCredentials } from "@/lib/session";
 import { testConnection } from "@/lib/arango-client";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function POST() {
   const checks: Record<string, { ok: boolean; detail: string }> = {};
 
-  // 1. Parse request body
-  let sessionToken: string | undefined;
-  try {
-    const body = (await req.json()) as { sessionToken?: string };
-    sessionToken = body.sessionToken;
-    checks.token_received = {
-      ok: Boolean(sessionToken),
-      detail: sessionToken
-        ? `token present (${sessionToken.length} chars)`
-        : "no sessionToken in request body — chat is not forwarding credentials",
-    };
-  } catch {
-    return Response.json(
-      {
-        status: "error",
-        checks: {
-          token_received: {
-            ok: false,
-            detail: "failed to parse request body as JSON",
-          },
-        },
-      },
-      { status: 400 }
-    );
+  // 1. Cookie presence
+  const jar = await cookies();
+  const token = jar.get("arango_session")?.value;
+
+  checks.cookie_present = {
+    ok: Boolean(token),
+    detail: token
+      ? `session cookie found (${token.length} chars)`
+      : "arango_session cookie missing — reconnect to set it",
+  };
+
+  if (!token) {
+    return Response.json({ status: "degraded", checks }, { status: 401 });
   }
 
-  if (!sessionToken) {
-    return Response.json(
-      { status: "degraded", checks },
-      { status: 400 }
-    );
-  }
-
-  // 2. Decrypt the token
+  // 2. Decrypt
   let creds: Awaited<ReturnType<typeof decryptCredentials>> | null = null;
   try {
-    creds = await decryptCredentials(sessionToken);
+    creds = await decryptCredentials(token);
     checks.token_decrypted = {
       ok: true,
       detail: `decrypted OK — url: ${creds.url}, database: ${creds.database}, username: ${creds.username}`,
@@ -57,7 +40,7 @@ export async function POST(req: Request) {
     return Response.json({ status: "degraded", checks }, { status: 401 });
   }
 
-  // 3. Validate credential fields
+  // 3. Field completeness
   const missing = (["url", "username", "password", "database"] as const).filter(
     (k) => !creds![k]
   );
@@ -69,7 +52,7 @@ export async function POST(req: Request) {
         : `missing fields: ${missing.join(", ")}`,
   };
 
-  // 4. Live ArangoDB connection test using the decrypted creds
+  // 4. Live ArangoDB ping
   try {
     const status = await testConnection(creds);
     checks.arango_connection = {
@@ -81,9 +64,7 @@ export async function POST(req: Request) {
   } catch (err) {
     checks.arango_connection = {
       ok: false,
-      detail: err instanceof Error
-        ? err.message
-        : "connection attempt threw an unknown error",
+      detail: err instanceof Error ? err.message : "unknown error",
     };
   }
 

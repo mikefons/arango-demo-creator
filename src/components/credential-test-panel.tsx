@@ -21,18 +21,14 @@ interface TestResponse {
   checks: Record<string, CheckResult>;
 }
 
-interface CredentialTestPanelProps {
-  sessionToken: string;
-}
-
 const CHECK_LABELS: Record<string, string> = {
-  token_received: "Token forwarded by chat",
+  cookie_present: "Session cookie present",
   token_decrypted: "Token decrypted",
   credentials_complete: "Credential fields complete",
   arango_connection: "ArangoDB live connection",
 };
 
-export function CredentialTestPanel({ sessionToken }: CredentialTestPanelProps) {
+export function CredentialTestPanel() {
   const [result, setResult] = useState<TestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -42,11 +38,7 @@ export function CredentialTestPanel({ sessionToken }: CredentialTestPanelProps) 
     setResult(null);
     setExpanded(true);
     try {
-      const res = await fetch("/api/test-credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionToken }),
-      });
+      const res = await fetch("/api/test-credentials", { method: "POST" });
       const data = (await res.json()) as TestResponse;
       setResult(data);
     } catch {

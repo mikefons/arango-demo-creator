@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, tool } from "ai";
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { decryptCredentials } from "@/lib/session";
 import {
   createCollections,
@@ -37,21 +38,24 @@ function toolError(label: string, err: unknown) {
 }
 
 export async function POST(req: Request) {
-  const { messages, sessionToken } = (await req.json()) as {
-    messages: { role: string; content: string }[];
-    sessionToken: string;
-  };
+  // Read session from HttpOnly cookie — never from request body
+  const jar = await cookies();
+  const token = jar.get("arango_session")?.value;
 
-  if (!sessionToken) {
-    return new Response("Missing session token", { status: 401 });
+  if (!token) {
+    return new Response("Missing session — please reconnect", { status: 401 });
   }
 
   let creds: Awaited<ReturnType<typeof decryptCredentials>>;
   try {
-    creds = await decryptCredentials(sessionToken);
+    creds = await decryptCredentials(token);
   } catch {
-    return new Response("Invalid or expired session", { status: 401 });
+    return new Response("Session expired — please reconnect", { status: 401 });
   }
+
+  const { messages } = (await req.json()) as {
+    messages: { role: string; content: string }[];
+  };
 
   const result = streamText({
     model: anthropic("claude-sonnet-4-6", {

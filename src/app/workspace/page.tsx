@@ -16,36 +16,31 @@ import { ChatInterface } from "@/components/chat-interface";
 import { GraphVisualizer } from "@/components/graph-visualizer";
 import { CredentialTestPanel } from "@/components/credential-test-panel";
 import { useArango } from "@/hooks/use-arango";
+import { clearSession, getSessionCredentials } from "@/app/actions";
 import type { CollectionDefinition } from "@/types";
 
 type ActivePanel = "chat" | "schema";
 
 export default function WorkspacePage() {
   const router = useRouter();
-  const {
-    sessionToken,
-    collections,
-    setSessionToken,
-    updateCollections,
-    disconnect,
-  } = useArango();
+  const { collections, updateCollections, resetCollections } = useArango();
   const [activePanel, setActivePanel] = useState<ActivePanel>("chat");
   const [ready, setReady] = useState(false);
   const [schemaKey, setSchemaKey] = useState(0);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("arango_session");
-    if (!stored) {
-      router.replace("/");
-      return;
-    }
-    setSessionToken(stored);
-    setReady(true);
-  }, [router, setSessionToken]);
+    getSessionCredentials().then((status) => {
+      if (!status.connected) {
+        router.replace("/");
+      } else {
+        setReady(true);
+      }
+    });
+  }, [router]);
 
-  function handleDisconnect() {
-    sessionStorage.removeItem("arango_session");
-    disconnect();
+  async function handleDisconnect() {
+    await clearSession();
+    resetCollections();
     router.replace("/");
   }
 
@@ -53,7 +48,7 @@ export default function WorkspacePage() {
     updateCollections(incoming);
   }
 
-  if (!ready || !sessionToken) {
+  if (!ready) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3 text-muted">
@@ -68,7 +63,6 @@ export default function WorkspacePage() {
     <div className="flex h-screen flex-col bg-background overflow-hidden">
       {/* Header */}
       <header className="h-14 flex-shrink-0 border-b border-border bg-background-secondary flex items-center gap-4 px-4">
-        {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-arango-400 rounded-lg flex items-center justify-center shadow-md shadow-arango-900/50">
             <Database className="w-3.5 h-3.5 text-background" />
@@ -83,14 +77,12 @@ export default function WorkspacePage() {
 
         <div className="h-4 w-px bg-border mx-1" />
 
-        {/* Schema stats */}
         <div className="flex items-center gap-2">
           {collections.length > 0 ? (
             <>
               <Badge variant="default" className="gap-1">
                 <Layers className="w-2.5 h-2.5" />
-                {collections.filter((c) => c.type === "document").length}{" "}
-                vertices
+                {collections.filter((c) => c.type === "document").length} vertices
               </Badge>
               <Badge variant="emerald" className="gap-1">
                 <ChevronRight className="w-2.5 h-2.5" />
@@ -143,7 +135,6 @@ export default function WorkspacePage() {
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Chat panel */}
         <main
           className={`flex flex-col border-r border-border overflow-hidden ${
             activePanel === "schema"
@@ -151,13 +142,9 @@ export default function WorkspacePage() {
               : "flex-1 lg:flex-1"
           }`}
         >
-          <ChatInterface
-            sessionToken={sessionToken}
-            onSchemaUpdate={handleSchemaUpdate}
-          />
+          <ChatInterface onSchemaUpdate={handleSchemaUpdate} onSessionExpired={() => router.replace("/")} />
         </main>
 
-        {/* Schema panel */}
         <aside
           className={`flex flex-col w-full lg:w-[380px] xl:w-[440px] overflow-hidden bg-background-secondary ${
             activePanel === "chat" ? "hidden lg:flex" : "flex"
@@ -186,7 +173,7 @@ export default function WorkspacePage() {
           <div className="flex-1 overflow-hidden">
             <GraphVisualizer key={schemaKey} collections={collections} />
           </div>
-          <CredentialTestPanel sessionToken={sessionToken} />
+          <CredentialTestPanel />
         </aside>
       </div>
     </div>

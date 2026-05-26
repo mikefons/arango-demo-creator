@@ -22,8 +22,8 @@ import type {
 } from "@/types";
 
 interface ChatInterfaceProps {
-  sessionToken: string;
   onSchemaUpdate: (collections: CollectionDefinition[]) => void;
+  onSessionExpired: () => void;
 }
 
 const STARTER_PROMPTS = [
@@ -48,8 +48,8 @@ const STARTER_PROMPTS = [
 ];
 
 export function ChatInterface({
-  sessionToken,
   onSchemaUpdate,
+  onSessionExpired,
 }: ChatInterfaceProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +60,11 @@ export function ChatInterface({
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
     useChat({
       api: "/api/chat",
-      body: { sessionToken },
+      onError: (err) => {
+        if (err.message.includes("401") || err.message.includes("Missing session")) {
+          onSessionExpired();
+        }
+      },
       onToolCall: ({ toolCall }) => {
         const typeMap: Record<string, ExecutionBlockType["type"]> = {
           createCollections: "collections",
@@ -149,23 +153,19 @@ export function ChatInterface({
       setTimeout(
         () =>
           handleSubmit(
-            { preventDefault: () => {} } as React.FormEvent<HTMLFormElement>,
-            { body: { sessionToken } }
+            { preventDefault: () => {} } as React.FormEvent<HTMLFormElement>
           ),
         50
       );
     },
-    [handleInputChange, handleSubmit, sessionToken]
+    [handleInputChange, handleSubmit]
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!isLoading && input.trim()) {
-        handleSubmit(
-          e as unknown as React.FormEvent<HTMLFormElement>,
-          { body: { sessionToken } }
-        );
+        handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
       }
     }
   };
@@ -325,7 +325,7 @@ export function ChatInterface({
       {/* Input area */}
       <div className="p-4 border-t border-border bg-background-secondary">
         <form
-          onSubmit={(e) => handleSubmit(e, { body: { sessionToken } })}
+          onSubmit={handleSubmit}
           className="flex gap-2 items-end"
         >
           <div className="flex-1 relative">

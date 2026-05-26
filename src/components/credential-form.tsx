@@ -19,7 +19,7 @@ import { validateAndEncryptCredentials } from "@/app/actions";
 import type { ArangoCredentials, ConnectionStatus } from "@/types";
 
 interface CredentialFormProps {
-  onSuccess: (token: string) => void;
+  onSuccess: () => void;
 }
 
 type FormState = "idle" | "validating" | "success" | "error";
@@ -62,10 +62,10 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
     setConnectedStatus(null);
 
     try {
-      const { token, status } = await validateAndEncryptCredentials(fields);
+      const { status } = await validateAndEncryptCredentials(fields);
       setConnectedStatus(status);
       setFormState("success");
-      setTimeout(() => onSuccess(token), 2000);
+      setTimeout(() => onSuccess(), 2000);
     } catch (err) {
       setFormState("error");
       setErrorMsg(
