@@ -169,6 +169,34 @@ export async function seedSyntheticData(
   return results;
 }
 
+export interface CollectionSummary {
+  name: string;
+  type: "document" | "edge";
+  count: number;
+}
+
+export async function listCollections(
+  creds: ArangoCredentials
+): Promise<CollectionSummary[]> {
+  const db = buildClient(creds);
+  try {
+    const cols = await db.listCollections(/* excludeSystem */ true);
+    const summaries = await Promise.all(
+      cols.map(async (col) => {
+        const count = await db.collection(col.name).count();
+        return {
+          name: col.name,
+          type: col.type === 3 ? ("edge" as const) : ("document" as const),
+          count: count.count,
+        };
+      })
+    );
+    return summaries.sort((a, b) => a.name.localeCompare(b.name));
+  } finally {
+    db.close();
+  }
+}
+
 export async function executeSampleQuery(
   creds: ArangoCredentials,
   rawAql: string,

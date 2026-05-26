@@ -64,11 +64,13 @@ export function ChatInterface({
       onToolCall: ({ toolCall }) => {
         const typeMap: Record<string, ExecutionBlockType["type"]> = {
           createCollections: "collections",
+          listCollections: "collections",
           seedSyntheticData: "seed",
           executeSampleQuery: "query",
         };
         const titleMap: Record<string, string> = {
           createCollections: "Creating collections...",
+          listCollections: "Listing collections...",
           seedSyntheticData: "Seeding synthetic data...",
           executeSampleQuery: "Running AQL query...",
         };

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { decryptCredentials } from "@/lib/session";
 import {
   createCollections,
+  listCollections,
   seedSyntheticData,
   executeSampleQuery,
 } from "@/lib/arango-client";
@@ -104,6 +105,28 @@ export async function POST(req: Request) {
             summary: results
               .map((r) => `Seeded ${r.inserted} docs into '${r.collection}'`)
               .join(", "),
+          };
+        },
+      }),
+
+      listCollections: tool({
+        description:
+          "List all user collections in the connected database with their type (document/edge) and document count. Call this to discover what already exists before creating or seeding.",
+        parameters: z.object({}),
+        execute: async () => {
+          const collections = await listCollections(creds);
+          const vertices = collections.filter((c) => c.type === "document");
+          const edges = collections.filter((c) => c.type === "edge");
+          return {
+            success: true,
+            total: collections.length,
+            vertices: vertices.length,
+            edges: edges.length,
+            collections,
+            summary:
+              collections.length === 0
+                ? "Database is empty — no user collections found"
+                : `Found ${collections.length} collection(s): ${collections.map((c) => `${c.name} (${c.type}, ${c.count} docs)`).join(", ")}`,
           };
         },
       }),
