@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Database, Link2, Layers, ArrowRight, Network, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { truncateString } from "@/lib/utils";
 import type { CollectionDefinition } from "@/types";
 
 interface GraphVisualizerProps {
@@ -266,7 +267,7 @@ function DiagramView({
                   fill="#10b981"
                   fontFamily="monospace"
                 >
-                  {truncate(edge.name, 12)}
+                  {truncateString(edge.name, 12)}
                 </text>
               </g>
             );
@@ -302,7 +303,7 @@ function DiagramView({
                 fill="#10b981"
                 fontFamily="monospace"
               >
-                {truncate(edge.name, 14)}
+                {truncateString(edge.name, 14)}
               </text>
             </g>
           );
@@ -329,7 +330,7 @@ function DiagramView({
               fontFamily="monospace"
               fontWeight="600"
             >
-              {truncate(v.name, 10)}
+              {truncateString(v.name, 10)}
             </text>
             {v.count != null && (
               <text
@@ -363,10 +364,6 @@ function DiagramView({
       </div>
     </div>
   );
-}
-
-function truncate(s: string, max: number) {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 /* ── Collection card ─────────────────────────────────────────────── */
