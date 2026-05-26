@@ -41,27 +41,32 @@ export async function createCollections(
   collections: CollectionDefinition[]
 ): Promise<{ name: string; type: string; created: boolean }[]> {
   const db = buildClient(creds);
-  const results: { name: string; type: string; created: boolean }[] = [];
 
   try {
-    for (const def of collections) {
-      const exists = await db.collection(def.name).exists();
-      if (!exists) {
-        if (def.type === "edge") {
-          await db.createEdgeCollection(def.name);
-        } else {
-          await db.createCollection(def.name);
+    // Check all existence in parallel — one round trip per collection simultaneously
+    const existenceChecks = await Promise.all(
+      collections.map((def) => db.collection(def.name).exists())
+    );
+
+    // Create only the missing ones, again in parallel
+    const results = await Promise.all(
+      collections.map(async (def, i) => {
+        if (!existenceChecks[i]) {
+          if (def.type === "edge") {
+            await db.createEdgeCollection(def.name);
+          } else {
+            await db.createCollection(def.name);
+          }
+          return { name: def.name, type: def.type, created: true };
         }
-        results.push({ name: def.name, type: def.type, created: true });
-      } else {
-        results.push({ name: def.name, type: def.type, created: false });
-      }
-    }
+        return { name: def.name, type: def.type, created: false };
+      })
+    );
+
+    return results;
   } finally {
     db.close();
   }
-
-  return results;
 }
 
 function buildSyntheticDocument(
@@ -180,7 +185,7 @@ export async function listCollections(
 ): Promise<CollectionSummary[]> {
   const db = buildClient(creds);
   try {
-    const cols = await db.listCollections(/* excludeSystem */ true);
+    const cols = await db.listCollections(true);
     const summaries = await Promise.all(
       cols.map(async (col) => {
         const count = await db.collection(col.name).count();
