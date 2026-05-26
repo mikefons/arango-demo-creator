@@ -8,6 +8,7 @@ import {
   listCollections,
   seedSyntheticData,
   executeSampleQuery,
+  dropCollections,
 } from "@/lib/arango-client";
 import { GRAPH_MODELER_SYSTEM_PROMPT } from "@/lib/prompt-templates";
 
@@ -190,6 +191,34 @@ export async function POST(req: Request) {
             };
           } catch (err) {
             return toolError("executeSampleQuery", err);
+          }
+        },
+      }),
+
+      dropCollections: tool({
+        description:
+          "Permanently drop named collections from the database. Only call this AFTER the user has explicitly confirmed they want to delete the listed collections. Always state the collection names and ask for confirmation before calling this tool.",
+        parameters: z.object({
+          names: z
+            .array(z.string())
+            .min(1)
+            .describe("Exact collection names to drop"),
+        }),
+        execute: async ({ names }) => {
+          try {
+            const result = await dropCollections(creds, names);
+            const allOk = result.errors.length === 0;
+            return {
+              success: allOk,
+              dropped: result.dropped,
+              errors: result.errors,
+              summary:
+                result.dropped.length > 0
+                  ? `Dropped: ${result.dropped.join(", ")}${result.errors.length > 0 ? `. Failed: ${result.errors.join(", ")}` : ""}`
+                  : `Failed to drop: ${result.errors.join(", ")}`,
+            };
+          } catch (err) {
+            return toolError("dropCollections", err);
           }
         },
       }),

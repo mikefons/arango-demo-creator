@@ -246,6 +246,31 @@ export async function listCollections(
   }
 }
 
+export async function dropCollections(
+  creds: ArangoCredentials,
+  names: string[]
+): Promise<{ dropped: string[]; errors: string[] }> {
+  const db = buildClient(creds);
+  try {
+    const results = await Promise.all(
+      names.map(async (name) => {
+        try {
+          await withTimeout(db.collection(name).drop(), `dropCollections:${name}`);
+          return { name, ok: true, error: "" };
+        } catch (err) {
+          return { name, ok: false, error: err instanceof Error ? err.message : "unknown" };
+        }
+      })
+    );
+    return {
+      dropped: results.filter((r) => r.ok).map((r) => r.name),
+      errors: results.filter((r) => !r.ok).map((r) => `${r.name}: ${r.error}`),
+    };
+  } finally {
+    db.close();
+  }
+}
+
 export async function executeSampleQuery(
   creds: ArangoCredentials,
   rawAql: string,

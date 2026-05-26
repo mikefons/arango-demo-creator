@@ -23,6 +23,7 @@ import type {
 
 interface ChatInterfaceProps {
   onSchemaUpdate: (collections: CollectionDefinition[]) => void;
+  onSchemaRemove: (names: string[]) => void;
   onSessionExpired: () => void;
 }
 
@@ -49,6 +50,7 @@ const STARTER_PROMPTS = [
 
 export function ChatInterface({
   onSchemaUpdate,
+  onSchemaRemove,
   onSessionExpired,
 }: ChatInterfaceProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -71,12 +73,14 @@ export function ChatInterface({
           listCollections: "collections",
           seedSyntheticData: "seed",
           executeSampleQuery: "query",
+          dropCollections: "collections",
         };
         const titleMap: Record<string, string> = {
           createCollections: "Creating collections...",
           listCollections: "Listing collections...",
           seedSyntheticData: "Seeding synthetic data...",
           executeSampleQuery: "Running AQL query...",
+          dropCollections: "Dropping collections...",
         };
         setExecutionBlocks((prev) => {
           const next = [
@@ -133,6 +137,14 @@ export function ChatInterface({
             attributes: [],
           }));
           onSchemaUpdate(defs);
+        }
+
+        if (
+          ti.toolName === "dropCollections" &&
+          Array.isArray(result.dropped) &&
+          (result.dropped as string[]).length > 0
+        ) {
+          onSchemaRemove(result.dropped as string[]);
         }
 
         setExecutionBlocks((prev) =>

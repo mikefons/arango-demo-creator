@@ -23,7 +23,7 @@ type ActivePanel = "chat" | "schema";
 
 export default function WorkspacePage() {
   const router = useRouter();
-  const { collections, updateCollections, resetCollections } = useArango();
+  const { collections, updateCollections, removeCollections, resetCollections } = useArango();
   const [activePanel, setActivePanel] = useState<ActivePanel>("chat");
   const [ready, setReady] = useState(false);
   const [schemaKey, setSchemaKey] = useState(0);
@@ -46,6 +46,10 @@ export default function WorkspacePage() {
 
   function handleSchemaUpdate(incoming: CollectionDefinition[]) {
     updateCollections(incoming);
+  }
+
+  function handleSchemaRemove(names: string[]) {
+    removeCollections(names);
   }
 
   if (!ready) {
@@ -142,7 +146,7 @@ export default function WorkspacePage() {
               : "flex-1 lg:flex-1"
           }`}
         >
-          <ChatInterface onSchemaUpdate={handleSchemaUpdate} onSessionExpired={() => router.replace("/")} />
+          <ChatInterface onSchemaUpdate={handleSchemaUpdate} onSchemaRemove={handleSchemaRemove} onSessionExpired={() => router.replace("/")} />
         </main>
 
         <aside

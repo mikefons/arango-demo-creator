@@ -16,9 +16,13 @@ export function useArango() {
     });
   }, []);
 
+  const removeCollections = useCallback((names: string[]) => {
+    setCollections((prev) => prev.filter((c) => !names.includes(c.name)));
+  }, []);
+
   const resetCollections = useCallback(() => {
     setCollections([]);
   }, []);
 
-  return { collections, updateCollections, resetCollections };
+  return { collections, updateCollections, removeCollections, resetCollections };
 }
