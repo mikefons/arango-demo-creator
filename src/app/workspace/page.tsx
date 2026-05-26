@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Database,
@@ -48,13 +48,13 @@ export default function WorkspacePage() {
     router.replace("/");
   }
 
-  function handleSchemaUpdate(incoming: CollectionDefinition[]) {
+  const handleSchemaUpdate = useCallback((incoming: CollectionDefinition[]) => {
     updateCollections(incoming);
-  }
+  }, [updateCollections]);
 
-  function handleSchemaRemove(names: string[]) {
+  const handleSchemaRemove = useCallback((names: string[]) => {
     removeCollections(names);
-  }
+  }, [removeCollections]);
 
   if (!ready) {
     return (

@@ -53,7 +53,7 @@ export function ChatInterface({
   onSchemaRemove,
   onSessionExpired,
 }: ChatInterfaceProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [executionBlocks, setExecutionBlocks] = useState<ExecutionBlockType[]>(
     []
@@ -63,7 +63,12 @@ export function ChatInterface({
     useChat({
       api: "/api/chat",
       onError: (err) => {
-        if (err.message.includes("401") || err.message.includes("Missing session")) {
+        const msg = err.message;
+        if (
+          msg.includes("401") ||
+          msg.includes("Missing session") ||
+          msg.includes("Session expired")
+        ) {
           onSessionExpired();
         }
       },
@@ -162,13 +167,10 @@ export function ChatInterface({
         );
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, onSchemaUpdate, onSchemaRemove]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, executionBlocks]);
 
   function handleTextareaInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -196,7 +198,7 @@ export function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
-        <div ref={scrollRef} className="flex flex-col gap-4 p-4">
+        <div className="flex flex-col gap-4 p-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] gap-6 text-center px-4">
               <div className="relative">
@@ -342,6 +344,7 @@ export function ChatInterface({
                 </div>
               </div>
             )}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
