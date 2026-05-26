@@ -78,16 +78,19 @@ export function ChatInterface({
           seedSyntheticData: "Seeding synthetic data...",
           executeSampleQuery: "Running AQL query...",
         };
-        setExecutionBlocks((prev) => [
-          ...prev,
-          {
-            id: toolCall.toolCallId,
-            type: typeMap[toolCall.toolName] ?? "info",
-            status: "running",
-            title: titleMap[toolCall.toolName] ?? toolCall.toolName,
-            timestamp: Date.now(),
-          },
-        ]);
+        setExecutionBlocks((prev) => {
+          const next = [
+            ...prev,
+            {
+              id: toolCall.toolCallId,
+              type: typeMap[toolCall.toolName] ?? "info",
+              status: "running" as const,
+              title: titleMap[toolCall.toolName] ?? toolCall.toolName,
+              timestamp: Date.now(),
+            },
+          ];
+          return next.length > 50 ? next.slice(-50) : next;
+        });
       },
     });
 
