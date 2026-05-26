@@ -129,12 +129,13 @@ export function ChatInterface({
           Array.isArray(result.collections)
         ) {
           const defs: CollectionDefinition[] = (
-            result.collections as Array<{ name: string; type: "document" | "edge" }>
+            result.collections as Array<{ name: string; type: "document" | "edge"; count?: number }>
           ).map((c) => ({
             name: c.name,
             type: c.type,
             description: "",
             attributes: [],
+            count: c.count,
           }));
           onSchemaUpdate(defs);
         }

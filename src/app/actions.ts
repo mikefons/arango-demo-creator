@@ -61,6 +61,7 @@ export async function getExistingCollections(): Promise<CollectionDefinition[]> 
       type: c.type,
       description: "",
       attributes: [],
+      count: c.count,
     }));
   } catch {
     return [];

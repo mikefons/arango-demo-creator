@@ -10,6 +10,7 @@ export interface CollectionDefinition {
   type: "document" | "edge";
   description: string;
   attributes: AttributeDefinition[];
+  count?: number;
 }
 
 export interface AttributeDefinition {

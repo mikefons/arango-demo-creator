@@ -48,7 +48,7 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 0.3s ease-in-out",
         "slide-up": "slideUp 0.3s ease-out",
-        "pulse-violet": "pulseViolet 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "pulse-green": "pulseGreen 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         shimmer: "shimmer 2s linear infinite",
       },
       keyframes: {

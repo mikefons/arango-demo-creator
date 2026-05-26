@@ -321,7 +321,7 @@ function DiagramView({
             />
             <text
               x={positions[i].x}
-              y={positions[i].y}
+              y={v.count != null ? positions[i].y - 4 : positions[i].y}
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="8"
@@ -331,6 +331,19 @@ function DiagramView({
             >
               {truncate(v.name, 10)}
             </text>
+            {v.count != null && (
+              <text
+                x={positions[i].x}
+                y={positions[i].y + 7}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="7"
+                fill="#7FAF8A"
+                fontFamily="monospace"
+              >
+                {v.count.toLocaleString()}
+              </text>
+            )}
           </g>
         ))}
       </svg>
@@ -378,6 +391,11 @@ function CollectionCard({
         <Badge variant={isEdge ? "emerald" : "default"} className="text-[10px]">
           {isEdge ? "edge" : "vertex"}
         </Badge>
+        {col.count != null && (
+          <span className="ml-auto text-[10px] text-muted tabular-nums">
+            {col.count.toLocaleString()} docs
+          </span>
+        )}
       </div>
       {col.description && (
         <p className="text-xs text-muted">{col.description}</p>
