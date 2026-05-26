@@ -57,7 +57,7 @@ export function ChatInterface({
     []
   );
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, append } =
     useChat({
       api: "/api/chat",
       onError: (err) => {
@@ -166,18 +166,9 @@ export function ChatInterface({
 
   const sendStarter = useCallback(
     (prompt: string) => {
-      handleInputChange({
-        target: { value: prompt },
-      } as React.ChangeEvent<HTMLTextAreaElement>);
-      setTimeout(
-        () =>
-          handleSubmit(
-            { preventDefault: () => {} } as React.FormEvent<HTMLFormElement>
-          ),
-        50
-      );
+      append({ role: "user", content: prompt });
     },
-    [handleInputChange, handleSubmit]
+    [append]
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
