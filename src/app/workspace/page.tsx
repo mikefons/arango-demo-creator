@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChatInterface } from "@/components/chat-interface";
 import { GraphVisualizer } from "@/components/graph-visualizer";
+import { CredentialTestPanel } from "@/components/credential-test-panel";
 import { useArango } from "@/hooks/use-arango";
 import type { CollectionDefinition } from "@/types";
 
@@ -185,6 +186,7 @@ export default function WorkspacePage() {
           <div className="flex-1 overflow-hidden">
             <GraphVisualizer key={schemaKey} collections={collections} />
           </div>
+          <CredentialTestPanel sessionToken={sessionToken} />
         </aside>
       </div>
     </div>
