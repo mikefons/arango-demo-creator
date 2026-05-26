@@ -1,4 +1,5 @@
 import { Database, aql } from "arangojs";
+import type { Config } from "arangojs/connection";
 import type {
   ArangoCredentials,
   CollectionDefinition,
@@ -10,11 +11,18 @@ import type {
 const REQUEST_TIMEOUT_MS = 15_000;
 
 function buildClient(creds: ArangoCredentials): Database {
-  return new Database({
+  // agentOptions is untyped in arangojs v9 but supported at runtime.
+  // keepAlive: false is required for Vercel serverless — each invocation
+  // is a fresh process, so reusing a keepalive connection from a prior
+  // invocation causes a "keepalive" fetch error.
+  const config = {
     url: creds.url,
     databaseName: creds.database,
     auth: { username: creds.username, password: creds.password },
-  });
+    agentOptions: { keepAlive: false },
+  } as unknown as Config;
+
+  return new Database(config);
 }
 
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
