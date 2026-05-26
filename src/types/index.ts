@@ -5,11 +5,6 @@ export interface ArangoCredentials {
   database: string;
 }
 
-export interface EncryptedSession {
-  token: string;
-  expiresAt: number;
-}
-
 export interface CollectionDefinition {
   name: string;
   type: "document" | "edge";
@@ -53,7 +48,7 @@ export interface QueryResult {
 
 export interface ExecutionBlock {
   id: string;
-  type: "collections" | "seed" | "query" | "error" | "info";
+  type: "collections" | "seed" | "query" | "drop" | "error" | "info";
   status: "pending" | "running" | "done" | "failed";
   title: string;
   detail?: string;

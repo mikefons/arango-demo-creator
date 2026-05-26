@@ -73,7 +73,7 @@ export function ChatInterface({
           listCollections: "collections",
           seedSyntheticData: "seed",
           executeSampleQuery: "query",
-          dropCollections: "collections",
+          dropCollections: "drop",
         };
         const titleMap: Record<string, string> = {
           createCollections: "Creating collections...",

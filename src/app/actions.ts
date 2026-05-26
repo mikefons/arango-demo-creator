@@ -2,8 +2,8 @@
 
 import { cookies } from "next/headers";
 import { encryptCredentials, decryptCredentials } from "@/lib/session";
-import { testConnection } from "@/lib/arango-client";
-import type { ArangoCredentials, ConnectionStatus } from "@/types";
+import { testConnection, listCollections } from "@/lib/arango-client";
+import type { ArangoCredentials, ConnectionStatus, CollectionDefinition } from "@/types";
 
 const COOKIE_NAME = "arango_session";
 const COOKIE_MAX_AGE = 3600; // 1 hour — matches JWT TTL
@@ -45,5 +45,24 @@ export async function getSessionCredentials(): Promise<ConnectionStatus> {
     return testConnection(creds);
   } catch {
     return { connected: false, error: "Invalid or expired session" };
+  }
+}
+
+export async function getExistingCollections(): Promise<CollectionDefinition[]> {
+  const jar = await cookies();
+  const token = jar.get(COOKIE_NAME)?.value;
+  if (!token) return [];
+
+  try {
+    const creds = await decryptCredentials(token);
+    const summaries = await listCollections(creds);
+    return summaries.map((c) => ({
+      name: c.name,
+      type: c.type,
+      description: "",
+      attributes: [],
+    }));
+  } catch {
+    return [];
   }
 }

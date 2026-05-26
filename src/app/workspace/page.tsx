@@ -16,7 +16,7 @@ import { ChatInterface } from "@/components/chat-interface";
 import { GraphVisualizer } from "@/components/graph-visualizer";
 import { CredentialTestPanel } from "@/components/credential-test-panel";
 import { useArango } from "@/hooks/use-arango";
-import { clearSession, getSessionCredentials } from "@/app/actions";
+import { clearSession, getSessionCredentials, getExistingCollections } from "@/app/actions";
 import type { CollectionDefinition } from "@/types";
 
 type ActivePanel = "chat" | "schema";
@@ -34,9 +34,13 @@ export default function WorkspacePage() {
         router.replace("/");
       } else {
         setReady(true);
+        // Populate schema panel with any collections that already exist
+        getExistingCollections().then((cols) => {
+          if (cols.length > 0) updateCollections(cols);
+        });
       }
     });
-  }, [router]);
+  }, [router, updateCollections]);
 
   async function handleDisconnect() {
     await clearSession();
