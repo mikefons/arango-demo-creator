@@ -33,9 +33,9 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
   const [connectedStatus, setConnectedStatus] = useState<ConnectionStatus | null>(null);
   const [fields, setFields] = useState<ArangoCredentials>({
     url: "",
-    username: "root",
+    username: "",
     password: "",
-    database: "_system",
+    database: "",
   });
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof ArangoCredentials, string>>
@@ -194,7 +194,7 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
                   {
                     step: "1",
                     title: "Visit the ArangoGraph dashboard",
-                    desc: "Create a free account and spin up a managed deployment.",
+                    desc: "Create a free account, spin up a managed deployment, and create a database.",
                   },
                   {
                     step: "2",
@@ -278,7 +278,7 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
                     <Input
                       id="username"
                       type="text"
-                      placeholder="root"
+                      placeholder="username"
                       value={fields.username}
                       onChange={(e) => update("username", e.target.value)}
                       className="pl-9"
@@ -312,7 +312,7 @@ export function CredentialForm({ onSuccess }: CredentialFormProps) {
                     <Input
                       id="database"
                       type="text"
-                      placeholder="_system"
+                      placeholder="database name"
                       value={fields.database}
                       onChange={(e) => update("database", e.target.value)}
                       className="pl-9"
